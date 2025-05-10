@@ -342,7 +342,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\BlueSky Labs\\swipr\\prisma\\generated\\prisma",
+      "value": "C:\\BlueSky Labs\\swipr-1\\prisma\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -356,11 +356,11 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\BlueSky Labs\\swipr\\prisma\\schema.prisma",
+    "sourceFilePath": "C:\\BlueSky Labs\\swipr-1\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": "../../../.env",
+    "rootEnvPath": null,
     "schemaEnvPath": "../../../.env"
   },
   "relativePath": "../..",
@@ -370,12 +370,11 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
-  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
         "fromEnvVar": "DATABASE_URL",
-        "value": null
+        "value": "postgresql://postgres.knheznkuqdbwcfiyjrcp:8kB8J3bjoQZiJmoR@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
       }
     }
   },

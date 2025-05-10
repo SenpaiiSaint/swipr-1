@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always explicitly type array elements in .map() functions when the array comes from a database query or external source, even if TypeScript could potentially infer the type. This is especially important for Prisma queries where the shape of the data is well-defined.
