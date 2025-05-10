@@ -1,0 +1,264 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  orgId         String
+  org           Organization    @relation(fields: [orgId], references: [id])
+  name          String?
+  email         String          @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?         // bcrypt hash
+  role          Role            @default(EMPLOYEE)
+  jobTitle      String?
+  department    String?
+  phone         String?
+  officeLocation String?
+  preferences   UserPreferences?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+}
+
+model UserPreferences {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  defaultCardId     String?
+  notificationEmail Boolean  @default(true)
+  notificationSMS   Boolean  @default(false)
+  currency          String   @default("USD")
+  timezone          String   @default("America/New_York")
+  language          String   @default("en")
+  theme             String   @default("light")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?    @db.Text
+  access_token      String?    @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?    @db.Text
+  session_state     String?
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Organization {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  industry        String?
+  companySize     String?
+  subscriptionTier SubscriptionTier @default(FREE)
+  billingEmail    String?
+  billingAddress  String?
+  users           User[]
+  cards           Card[]
+  budgets         Budget[]
+  policies        Policy[]
+  transactions    Transaction[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  @@index([name])
+  @@index([industry])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum CardNetwork {
+  VISA
+  MASTERCARD
+  AMEX
+  DISCOVER
+}
+
+model Card {
+  id            String        @id @default(cuid())
+  orgId         String
+  org           Organization  @relation(fields: [orgId], references: [id])
+  nickname      String
+  stripeCardId  String        @unique
+  last4         String        @db.VarChar(4)
+  network       CardNetwork   @default(VISA)
+  expirationMonth Int?
+  expirationYear Int?
+  status        CardStatus    @default(ACTIVE)
+  type          CardType      @default(CORPORATE)
+  monthlyLimit  Int?
+  totalSpent    Int          @default(0)
+  averageTransaction Int      @default(0)
+  lastUsed      DateTime?
+  statusHistory CardStatusHistory[]
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orgId])
+  @@index([status])
+  @@index([type])
+  @@index([network])
+}
+
+enum CardStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum CardType {
+  CORPORATE
+  EMPLOYEE
+  VIRTUAL
+}
+
+model CardStatusHistory {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id])
+  status    String
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+enum BudgetCategory {
+  PARTS_AND_MATERIALS
+  EQUIPMENT
+  TRAVEL
+  TRAINING
+  MARKETING
+  DIAMOND_INVENTORY
+  SECURITY
+  INSURANCE
+  FABRIC_AND_MATERIALS
+  MANUFACTURING
+  RETAIL_SPACE
+}
+
+model Budget {
+  id          String         @id @default(cuid())
+  orgId       String
+  org         Organization   @relation(fields: [orgId], references: [id])
+  category    BudgetCategory
+  amountCents Int
+  period      BudgetPeriod
+  spentCents  Int           @default(0)
+  utilization Float         @default(0)
+  alertThreshold Int        @default(80) // Percentage
+  lastAlert   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum BudgetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Policy {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id])
+  name       String
+  expression String // "amount < 50000 && merchant != 'ALCOHOL'"
+  isActive   Boolean      @default(true)
+}
+
+model Transaction {
+  id           String         @id @default(cuid())
+  orgId        String
+  org          Organization   @relation(fields: [orgId], references: [id])
+  stripeAuthId String         @unique
+  cardId       String
+  card         Card          @relation(fields: [cardId], references: [id])
+  amountCents  Int
+  merchant     String
+  category     BudgetCategory
+  description  String?
+  location     String?
+  status       TxnStatus     @default(PENDING)
+  reason       String?
+  receiptUrl   String?
+  isRecurring  Boolean       @default(false)
+  expenseType  ExpenseType   @default(ONE_TIME)
+  notes        String?
+  tags         String[]      // Array of tags
+  attachments  String[]      // Array of attachment URLs
+  approvedBy   String?
+  rejectedBy   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([orgId])
+  @@index([cardId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+}
+
+enum TxnStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum ExpenseType {
+  ONE_TIME
+  SUBSCRIPTION
+  RECURRING
+}
