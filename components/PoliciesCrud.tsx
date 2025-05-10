@@ -24,7 +24,7 @@ export default function PoliciesCrud() {
     setLoading(true);
     fetch("/api/policies")
       .then((res) => res.json())
-      .then((data) => setPolicies(data))
+      .then((data) => setPolicies(data.data || []))
       .finally(() => setLoading(false));
   };
 
@@ -87,100 +87,149 @@ export default function PoliciesCrud() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-      <h2 className="text-lg font-bold mb-4">Manage Policies</h2>
-      <form onSubmit={handleSubmit} className="space-y-2 mb-6">
-        <div className="flex gap-2">
-          <input
-            name="name"
-            className="border p-2 flex-1"
-            placeholder="Policy Name"
-            value={form.name}
-            onChange={handleChange}
-            required
-          />
-          <input
-            name="expression"
-            className="border p-2 flex-1"
-            placeholder="Expression (e.g. amount < 50000)"
-            value={form.expression}
-            onChange={handleChange}
-            required
-          />
-          <label className="flex items-center gap-1">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div className="p-6 border-b border-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900">Manage Policies</h2>
+        <p className="mt-1 text-sm text-gray-500">Create and manage spending policies for your organization</p>
+      </div>
+      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              Policy Name
+            </label>
             <input
-              name="isActive"
-              type="checkbox"
-              checked={form.isActive}
+              id="name"
+              name="name"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              placeholder="e.g. Daily Coffee Limit"
+              value={form.name}
               onChange={handleChange}
+              required
             />
-            Active
-          </label>
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded"
-            disabled={submitting}
-          >
-            {editing ? "Update" : "Add"}
-          </button>
-          {editing && (
+          </div>
+          <div>
+            <label htmlFor="expression" className="block text-sm font-medium text-gray-700 mb-1">
+              Expression
+            </label>
+            <input
+              id="expression"
+              name="expression"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono text-sm"
+              placeholder="e.g. amount < 50000"
+              value={form.expression}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center space-x-2">
+              <input
+                name="isActive"
+                type="checkbox"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                checked={form.isActive}
+                onChange={handleChange}
+              />
+              <span className="text-sm text-gray-700">Active</span>
+            </label>
+          </div>
+          <div className="flex items-end space-x-2">
             <button
-              type="button"
-              className="ml-2 text-gray-500 underline"
-              onClick={() => {
-                setEditing(null);
-                setForm({ name: "", expression: "", isActive: true });
-              }}
+              type="submit"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={submitting}
             >
-              Cancel
+              {editing ? "Update Policy" : "Add Policy"}
             </button>
-          )}
+            {editing && (
+              <button
+                type="button"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={() => {
+                  setEditing(null);
+                  setForm({ name: "", expression: "", isActive: true });
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
-        {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
+        {error && (
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
-      {loading ? (
-        <p className="text-gray-600">Loading policies...</p>
-      ) : policies.length === 0 ? (
-        <p className="text-gray-600">No policies found.</p>
-      ) : (
-        <table className="min-w-full bg-white rounded shadow">
-          <thead>
-            <tr>
-              <th className="py-2 px-4 text-left">Name</th>
-              <th className="py-2 px-4 text-left">Expression</th>
-              <th className="py-2 px-4 text-left">Active</th>
-              <th className="py-2 px-4 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {policies.map((policy) => (
-              <tr key={policy.id} className="border-t">
-                <td className="py-2 px-4">{policy.name}</td>
-                <td className="py-2 px-4 font-mono text-xs">
-                  {policy.expression}
-                </td>
-                <td className="py-2 px-4">{policy.isActive ? "Yes" : "No"}</td>
-                <td className="py-2 px-4">
-                  <button
-                    className="text-blue-600 underline mr-2"
-                    onClick={() => handleEdit(policy)}
-                    disabled={submitting}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="text-red-600 underline"
-                    onClick={() => handleDelete(policy.id)}
-                    disabled={submitting}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className="px-6 pb-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : policies.length === 0 ? (
+          <div className="text-center py-8">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No policies</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by creating a new policy.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expression</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {policies.map((policy) => (
+                  <tr key={policy.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{policy.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{policy.expression}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        policy.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {policy.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        onClick={() => handleEdit(policy)}
+                        disabled={submitting}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-red-600 hover:text-red-900"
+                        onClick={() => handleDelete(policy.id)}
+                        disabled={submitting}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

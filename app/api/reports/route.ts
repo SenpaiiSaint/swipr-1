@@ -6,9 +6,9 @@ import { z } from "zod";
 
 // Query parameter validation schema
 const querySchema = z.object({
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  status: z.nativeEnum(TxnStatus).optional(),
+  startDate: z.string().datetime().optional().nullable(),
+  endDate: z.string().datetime().optional().nullable(),
+  status: z.nativeEnum(TxnStatus).optional().nullable(),
 });
 
 // Type for the groupBy result
@@ -29,31 +29,11 @@ type CategoryGroupResult = {
   _count: number;
 };
 
-// Type for the transaction with card details
-type TransactionWithCard = {
-  id: string;
-  amountCents: number;
-  merchant: string;
-  category: BudgetCategory;
-  status: TxnStatus;
-  createdAt: Date;
-  card: {
-    nickname: string | null;
-    last4: string;
-  } | null;
-};
-
-/**
- * GET /api/reports
- * Generates financial reports for the authenticated organization
- * @param {NextRequest} request - The incoming request
- * @returns {Promise<NextResponse>} Success or error
- */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Authenticate user
     const session = await auth();
-    if (!session?.user) {
+    if (!session?.user?.orgId) {
       console.error("Unauthorized access attempt");
       return NextResponse.json(
         { error: "Unauthorized", status: 401 },
@@ -69,29 +49,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       status: searchParams.get("status"),
     };
 
-    let validatedParams;
-    try {
-      validatedParams = querySchema.parse(queryParams);
-    } catch (err) {
-      console.error("Invalid query parameters:", err);
+    const validationResult = querySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      console.error("Invalid query parameters:", validationResult.error);
       return NextResponse.json(
         { error: "Invalid query parameters", status: 400 },
         { status: 400 }
       );
     }
 
+    const { startDate, endDate, status } = validationResult.data;
+
     // Build where clause
     const where = {
       orgId: session.user.orgId,
-      ...(validatedParams.status && { status: validatedParams.status }),
-      ...(validatedParams.startDate && {
+      ...(status && { status }),
+      ...(startDate && {
         createdAt: {
-          gte: new Date(validatedParams.startDate),
+          gte: new Date(startDate),
         },
       }),
-      ...(validatedParams.endDate && {
+      ...(endDate && {
         createdAt: {
-          lte: new Date(validatedParams.endDate),
+          lte: new Date(endDate),
         },
       }),
     };
@@ -162,7 +142,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         transactionCount: row._count,
       })),
       spendByCard: cardDetails,
-      recentTransactions: (recentTransactions as TransactionWithCard[]).map((txn) => ({
+      recentTransactions: recentTransactions.map((txn) => ({
         id: txn.id,
         amountCents: txn.amountCents,
         merchant: txn.merchant,

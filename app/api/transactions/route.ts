@@ -6,11 +6,11 @@ import { z } from "zod";
 
 // Input validation schemas
 const querySchema = z.object({
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-  status: z.nativeEnum(TxnStatus).optional(),
-  category: z.nativeEnum(BudgetCategory).optional(),
-  cardId: z.string().min(1).optional(),
+  startDate: z.string().datetime().optional().nullable(),
+  endDate: z.string().datetime().optional().nullable(),
+  status: z.nativeEnum(TxnStatus).optional().nullable(),
+  category: z.nativeEnum(BudgetCategory).optional().nullable(),
+  cardId: z.string().min(1).optional().nullable(),
   limit: z.number().min(1).max(100).optional().default(50),
   offset: z.number().min(0).optional().default(0),
 });
@@ -22,6 +22,7 @@ const createTransactionSchema = z.object({
   category: z.nativeEnum(BudgetCategory),
   description: z.string().optional(),
   stripeAuthId: z.string().min(1),
+  status: z.nativeEnum(TxnStatus).optional().default(TxnStatus.PENDING),
 });
 
 const updateTransactionSchema = z.object({
@@ -185,7 +186,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { cardId, amountCents, merchant, category, description, stripeAuthId } = validationResult.data;
+    const { cardId, amountCents, merchant, category, description, stripeAuthId, status } = validationResult.data;
 
     // Ensure card belongs to user's org
     const card = await prisma.card.findUnique({ where: { id: cardId } });
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         category,
         description,
         stripeAuthId,
-        status: TxnStatus.PENDING,
+        status,
       },
     });
 

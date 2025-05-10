@@ -1,8 +1,212 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import BudgetList from "@/components/BudgetList";
 import { prisma } from "@/lib/prisma";
 import CreateBudgetButton from "@/components/CreateBudgetButton";
+import DashboardClient from "@/components/DashboardClient";
+import Link from "next/link";
+import { Suspense } from "react";
+import { formatCurrency } from "@/lib/utils";
+
+// Loading component for dashboard sections
+function DashboardSectionSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Empty state component for transactions
+function EmptyTransactions() {
+  return (
+    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+      <p className="text-gray-500 mb-6">Get started by making your first transaction</p>
+      <Link 
+        href="/dashboard/cards" 
+        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+      >
+        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Create Card
+      </Link>
+    </div>
+  );
+}
+
+// Empty state component for budgets
+function EmptyBudgets() {
+  return (
+    <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No budgets configured</h3>
+      <p className="text-gray-500 mb-6">Set up your first budget to start tracking expenses</p>
+      <CreateBudgetButton />
+    </div>
+  );
+}
+
+// Helper function to get industry-specific metrics
+function getIndustryMetrics(industry: string | null, data: {
+  totalSpent: number;
+  activeCards: number;
+  activePolicies: number;
+  avgTransaction: number;
+}) {
+  const baseMetrics = [
+    {
+      label: "Total Spend",
+      value: formatCurrency(data.totalSpent),
+      iconBg: "bg-gradient-to-br from-blue-50 to-blue-100",
+      iconColor: "text-blue-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Active Cards",
+      value: data.activeCards.toString(),
+      iconBg: "bg-gradient-to-br from-purple-50 to-purple-100",
+      iconColor: "text-purple-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Active Policies",
+      value: data.activePolicies.toString(),
+      iconBg: "bg-gradient-to-br from-green-50 to-green-100",
+      iconColor: "text-green-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Avg Transaction",
+      value: formatCurrency(data.avgTransaction),
+      iconBg: "bg-gradient-to-br from-orange-50 to-orange-100",
+      iconColor: "text-orange-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+    },
+  ];
+
+  // Add industry-specific metrics
+  switch (industry?.toLowerCase()) {
+    case 'retail':
+      baseMetrics.push({
+        label: "Inventory Value",
+        value: formatCurrency(data.totalSpent * 0.3), // Example calculation
+        iconBg: "bg-gradient-to-br from-indigo-50 to-indigo-100",
+        iconColor: "text-indigo-600",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+      });
+      break;
+    case 'manufacturing':
+      baseMetrics.push({
+        label: "Production Cost",
+        value: formatCurrency(data.totalSpent * 0.4), // Example calculation
+        iconBg: "bg-gradient-to-br from-red-50 to-red-100",
+        iconColor: "text-red-600",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        ),
+      });
+      break;
+  }
+
+  return baseMetrics;
+}
+
+// Helper function to get industry-specific insights
+function getIndustryInsights(industry: string | null) {
+  const baseInsights = [
+    {
+      title: "Spending Patterns",
+      description: "Analyze your organization's spending patterns to identify cost-saving opportunities.",
+      iconBg: "bg-gradient-to-br from-blue-50 to-blue-100",
+      iconColor: "text-blue-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      ),
+    },
+    {
+      title: "Policy Compliance",
+      description: "Monitor policy compliance and identify areas for improvement.",
+      iconBg: "bg-gradient-to-br from-green-50 to-green-100",
+      iconColor: "text-green-600",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+  ];
+
+  // Add industry-specific insights
+  switch (industry?.toLowerCase()) {
+    case 'retail':
+      baseInsights.push({
+        title: "Inventory Management",
+        description: "Optimize inventory levels and reduce carrying costs.",
+        iconBg: "bg-gradient-to-br from-indigo-50 to-indigo-100",
+        iconColor: "text-indigo-600",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+      });
+      break;
+    case 'manufacturing':
+      baseInsights.push({
+        title: "Production Efficiency",
+        description: "Track production costs and identify efficiency improvements.",
+        iconBg: "bg-gradient-to-br from-red-50 to-red-100",
+        iconColor: "text-red-600",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        ),
+      });
+      break;
+  }
+
+  return baseInsights;
+}
 
 export default async function Dashboard() {
   const session = await auth();
@@ -10,380 +214,291 @@ export default async function Dashboard() {
     redirect("/auth/signin?callbackUrl=/dashboard");
   }
 
-  // Fetch budgets, cards, and policies for simulation
-  const [budgets, cards, policies] = await Promise.all([
-    prisma.budget.findMany({
-      where: { orgId: session.user.orgId },
-      orderBy: { category: "asc" },
-    }),
-    prisma.card.findMany({
-      where: { orgId: session.user.orgId },
-      select: { id: true, nickname: true },
-    }),
-    prisma.policy.findMany({
-      where: { orgId: session.user.orgId, isActive: true },
-      select: { id: true, name: true, expression: true },
-    }),
-  ]);
+  // Fetch organization details with more data
+  const organization = await prisma.organization.findUnique({
+    where: { id: session.user.orgId },
+    include: {
+      users: true,
+      cards: {
+        where: { status: 'ACTIVE' }
+      },
+      budgets: true,
+      policies: {
+        where: { isActive: true }
+      },
+      transactions: {
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: { card: true }
+      }
+    }
+  });
 
-  // Placeholder stats, replace with real queries as needed
-  const stats = {
-    totalBudgets: budgets.length,
-    totalCards: cards.length,
-    totalPolicies: policies.length,
-    totalTransactions: 128, // TODO: fetch real count
-    workflowCompletion: 0.25,
-    lastAction: "Approved",
-  };
+  if (!organization) {
+    redirect("/auth/signin");
+  }
 
-  // --- Simulation UI (client component) ---
-  const SimulationForm = (await import("@/components/SimulationForm")).default;
+  const budgets = organization.budgets || [];
+  const transactions = organization.transactions || [];
+  const activeCards = organization.cards?.length || 0;
+  const activePolicies = organization.policies?.length || 0;
+
+  // Calculate key metrics
+  const totalSpent = transactions.reduce((sum: number, txn) => sum + txn.amountCents, 0);
+  const avgTransaction = transactions.length > 0 ? totalSpent / transactions.length : 0;
+
+  // Get industry-specific metrics with actual data
+  const industryMetrics = getIndustryMetrics(organization.industry, {
+    totalSpent,
+    activeCards,
+    activePolicies,
+    avgTransaction
+  });
+
+  // Calculate spending by category
+  const spendingByCategory = transactions.reduce((acc: Record<string, number>, txn) => {
+    acc[txn.category] = (acc[txn.category] || 0) + txn.amountCents;
+    return acc;
+  }, {});
+
+  // Calculate spending by card
+  const spendingByCard = transactions.reduce((acc: Record<string, number>, txn) => {
+    const cardName = txn.card.nickname;
+    acc[cardName] = (acc[cardName] || 0) + txn.amountCents;
+    return acc;
+  }, {});
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
+        {/* Company Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Welcome back! Here&apos;s an overview of your
-                organization&apos;s spending and policies.
-              </p>
+              <h1 className="text-3xl font-bold text-gray-900">{organization.name}</h1>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {organization.industry}
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {organization.companySize}
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  {organization.subscriptionTier} Plan
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col md:flex-row gap-4 items-end md:items-center">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-100 px-6 py-3 flex items-center">
-                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center mr-3">
-                  <svg
-                    className="w-4 h-4 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+            <div className="flex items-center space-x-4">
+              <DashboardClient industry={organization.industry} />
+              <CreateBudgetButton />
+            </div>
+          </div>
+
+          {/* Industry-Specific Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {industryMetrics.map((metric, index) => (
+              <div 
+                key={index} 
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-200 transform hover:-translate-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{metric.label}</p>
+                    <p className="mt-2 text-3xl font-semibold text-gray-900">
+                      {metric.value}
+                    </p>
+                  </div>
+                  <div className={`w-12 h-12 ${metric.iconBg} rounded-lg flex items-center justify-center`}>
+                    <div className={metric.iconColor}>{metric.icon}</div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-600">
-                    Workflow completion
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-32 bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${stats.workflowCompletion * 100}%` }}
-                      />
+              </div>
+            ))}
+          </div>
+
+          {/* Company Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* Recent Transactions */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+                  <Link 
+                    href="/dashboard/transactions" 
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                  >
+                    View all
+                  </Link>
+                </div>
+              </div>
+              <div className="p-6">
+                <Suspense fallback={<DashboardSectionSkeleton />}>
+                  {transactions.length === 0 ? (
+                    <EmptyTransactions />
+                  ) : (
+                    <div className="space-y-4">
+                      {transactions.map((txn) => (
+                        <div 
+                          key={txn.id} 
+                          className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
+                              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{txn.merchant}</p>
+                              <p className="text-sm text-gray-600">{txn.card.nickname}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-gray-900">
+                              {formatCurrency(txn.amountCents)}
+                            </p>
+                            <p className={`text-sm ${
+                              txn.status === 'APPROVED' 
+                                ? 'text-green-600 bg-green-50' 
+                                : txn.status === 'DECLINED'
+                                ? 'text-red-600 bg-red-50'
+                                : 'text-yellow-600 bg-yellow-50'
+                            } px-2 py-1 rounded-full inline-block`}>
+                              {txn.status}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-sm font-medium text-blue-600">
-                      {Math.round(stats.workflowCompletion * 100)}%
-                    </span>
-                  </div>
+                  )}
+                </Suspense>
+              </div>
+            </div>
+
+            {/* Budget Overview */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Budget Overview</h2>
+                  <Link 
+                    href="/dashboard/budgets" 
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                  >
+                    View all
+                  </Link>
                 </div>
               </div>
-              <div className="bg-white rounded-lg shadow-sm border border-gray-100 px-6 py-3 flex items-center">
-                <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center mr-3">
-                  <svg
-                    className="w-4 h-4 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+              <div className="p-6">
+                <Suspense fallback={<DashboardSectionSkeleton />}>
+                  {budgets.length === 0 ? (
+                    <EmptyBudgets />
+                  ) : (
+                    <div className="space-y-6">
+                      {budgets.slice(0, 3).map((budget) => (
+                        <div key={budget.id} className="py-2">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium text-gray-900">{budget.category}</p>
+                            <p className="text-sm font-medium text-gray-600">
+                              {formatCurrency(budget.spentCents)} / {formatCurrency(budget.amountCents)}
+                            </p>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${budget.utilization}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Suspense>
+              </div>
+            </div>
+          </div>
+
+          {/* Spending Analytics */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* Spending by Category */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="text-lg font-semibold text-gray-900">Spending by Category</h2>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {Object.entries(spendingByCategory).map(([category, amount]) => (
+                    <div key={category} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {category.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="font-medium text-gray-900">{category}</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-600">
+                        {formatCurrency(amount)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <span className="text-sm text-gray-600">Current action</span>
-                  <div className="text-sm font-medium text-green-600">
-                    {stats.lastAction}
-                  </div>
+              </div>
+            </div>
+
+            {/* Spending by Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                <h2 className="text-lg font-semibold text-gray-900">Spending by Card</h2>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {Object.entries(spendingByCard).map(([cardName, amount]) => (
+                    <div key={cardName} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                          </svg>
+                        </div>
+                        <span className="font-medium text-gray-900">{cardName}</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-600">
+                        {formatCurrency(amount)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Budgets
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold text-gray-900">
-                    {stats.totalBudgets}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                </div>
-              </div>
+          {/* Industry-Specific Insights */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+              <h2 className="text-lg font-semibold text-gray-900">Industry Insights</h2>
             </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Active Cards
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold text-gray-900">
-                    {stats.totalCards}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-purple-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {getIndustryInsights(organization.industry).map((insight, index) => (
+                  <div 
+                    key={index} 
+                    className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-6 hover:shadow-md transition-all duration-200 transform hover:-translate-y-1 border border-gray-200"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Active Policies
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold text-gray-900">
-                    {stats.totalPolicies}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Transactions
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold text-gray-900">
-                    {stats.totalTransactions}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-orange-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Simulation Form */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Transaction Simulator
-            </h2>
-            <SimulationForm cards={cards} />
-          </div>
-
-          {/* Active Policies */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Active Policies
-            </h2>
-            {policies.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-600">
-                  No active policies found. Create your first policy to start
-                  enforcing spending rules.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {policies.map((policy: { id: string; name: string; expression: string }) => (
-                  <div key={policy.id} className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">
-                      {policy.name}
-                    </h3>
-                    <p className="text-sm text-gray-600">{policy.expression}</p>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 ${insight.iconBg} rounded-lg flex items-center justify-center shadow-sm`}>
+                        <div className={insight.iconColor}>{insight.icon}</div>
+                      </div>
+                      <h3 className="font-medium text-gray-900">{insight.title}</h3>
+                    </div>
+                    <p className="text-sm text-gray-600">{insight.description}</p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Recent Transactions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Recent Transactions
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Card
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Merchant
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      2024-06-01
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      Card 1234
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      €500
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        Approved
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      Amazon
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      2024-05-30
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      Card 5678
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      €1200
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                        Declined
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      Apple
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
           </div>
-
-          {/* Budgets List */}
-          {budgets.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-              <div className="max-w-md mx-auto">
-                <div className="rounded-full bg-indigo-50 p-3 w-12 h-12 mx-auto mb-4">
-                  <svg
-                    className="w-6 h-6 text-indigo-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  No Budgets Yet
-                </h2>
-                <p className="text-gray-500 mb-6">
-                  Create your first budget to start tracking your
-                  organization&apos;s spending.
-                </p>
-                <CreateBudgetButton />
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="text-lg font-medium text-gray-900">
-                  Budget Overview
-                </h2>
-              </div>
-              <BudgetList budgets={budgets} />
-            </div>
-          )}
         </div>
       </div>
     </main>
   );
 }
+
